@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - **Linux/macOS** (or WSL2 on Windows)
-- AI coding agent: [Claude Code](https://www.anthropic.com/claude-code), [GitHub Copilot](https://code.visualstudio.com/), or [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+- AI coding agent: [Claude Code](https://www.anthropic.com/claude-code), [Cursor CLI](https://docs.cursor.com/en/cli/overview), [GitHub Copilot](https://code.visualstudio.com/), or [Gemini CLI](https://github.com/google-gemini/gemini-cli)
 - [uv](https://docs.astral.sh/uv/) for package management
 - [Python 3.11+](https://www.python.org/downloads/)
 - [Git](https://git-scm.com/downloads)
@@ -31,6 +31,7 @@ You can proactively specify your AI agent during initialization:
 ```bash
 uvx --from git+https://github.com/github/spec-kit.git specify init <project_name> --ai claude
 uvx --from git+https://github.com/github/spec-kit.git specify init <project_name> --ai gemini
+uvx --from git+https://github.com/github/spec-kit.git specify init <project_name> --ai cursor
 uvx --from git+https://github.com/github/spec-kit.git specify init <project_name> --ai copilot
 ```
 
