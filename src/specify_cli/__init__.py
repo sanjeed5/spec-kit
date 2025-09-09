@@ -51,7 +51,8 @@ import readchar
 AI_CHOICES = {
     "copilot": "GitHub Copilot",
     "claude": "Claude Code",
-    "gemini": "Gemini CLI"
+    "gemini": "Gemini CLI",
+    "cursor": "Cursor CLI"
 }
 
 # ASCII Art Banner
@@ -338,6 +339,15 @@ def check_tool(tool: str, install_hint: str) -> bool:
         console.print(f"[yellow]⚠️  {tool} not found[/yellow]")
         console.print(f"   Install with: [cyan]{install_hint}[/cyan]")
         return False
+
+
+def check_cursor_cli() -> bool:
+    """Check if Cursor CLI is installed (supports 'cursor-agent' or 'cursor')."""
+    if shutil.which("cursor-agent") or shutil.which("cursor"):
+        return True
+    console.print("[yellow]⚠️  Cursor CLI not found[/yellow]")
+    console.print("   Install from: https://docs.cursor.com/en/cli/overview")
+    return False
 
 
 def is_git_repo(path: Path = None) -> bool:
@@ -638,7 +648,7 @@ def download_and_extract_template(project_path: Path, ai_assistant: str, is_curr
 @app.command()
 def init(
     project_name: str = typer.Argument(None, help="Name for your new project directory (optional if using --here)"),
-    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, or copilot"),
+    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, cursor, or copilot"),
     ignore_agent_tools: bool = typer.Option(False, "--ignore-agent-tools", help="Skip checks for AI agent tools like Claude Code"),
     no_git: bool = typer.Option(False, "--no-git", help="Skip git repository initialization"),
     here: bool = typer.Option(False, "--here", help="Initialize project in the current directory instead of creating a new one"),
@@ -648,7 +658,7 @@ def init(
     
     This command will:
     1. Check that required tools are installed (git is optional)
-    2. Let you choose your AI assistant (Claude Code, Gemini CLI, or GitHub Copilot)
+    2. Let you choose your AI assistant (Claude Code, Gemini CLI, Cursor CLI, or GitHub Copilot)
     3. Download the appropriate template from GitHub
     4. Extract the template to a new project directory or current directory
     5. Initialize a fresh git repository (if not --no-git and no existing repo)
@@ -658,9 +668,11 @@ def init(
         specify init my-project
         specify init my-project --ai claude
         specify init my-project --ai gemini
+        specify init my-project --ai cursor
         specify init my-project --ai copilot --no-git
         specify init --ignore-agent-tools my-project
         specify init --here --ai claude
+        specify init --here --ai cursor
         specify init --here
     """
     # Show banner first
@@ -736,6 +748,10 @@ def init(
         elif selected_ai == "gemini":
             if not check_tool("gemini", "Install from: https://github.com/google-gemini/gemini-cli"):
                 console.print("[red]Error:[/red] Gemini CLI is required for Gemini projects")
+                agent_tool_missing = True
+        elif selected_ai == "cursor":
+            if not check_cursor_cli():
+                console.print("[red]Error:[/red] Cursor CLI is required for Cursor projects")
                 agent_tool_missing = True
         # GitHub Copilot check is not needed as it's typically available in supported IDEs
         
@@ -821,6 +837,10 @@ def init(
         steps_lines.append("   - Run gemini /specify to create specifications")
         steps_lines.append("   - Run gemini /plan to create implementation plans")
         steps_lines.append("   - See GEMINI.md for all available commands")
+    elif selected_ai == "cursor":
+        steps_lines.append(f"{step_num}. Use Cursor CLI")
+        steps_lines.append("   - Run cursor-agent to start a session")
+        steps_lines.append("   - Add rules under .cursor/rules (see https://docs.cursor.com/en/context/rules)")
     elif selected_ai == "copilot":
         steps_lines.append(f"{step_num}. Open in Visual Studio Code and use [bold cyan]/specify[/], [bold cyan]/plan[/], [bold cyan]/tasks[/] commands with GitHub Copilot")
 
@@ -855,11 +875,15 @@ def check():
     console.print("\n[cyan]Optional AI tools:[/cyan]")
     claude_ok = check_tool("claude", "Install from: https://docs.anthropic.com/en/docs/claude-code/setup")
     gemini_ok = check_tool("gemini", "Install from: https://github.com/google-gemini/gemini-cli")
+    cursor_ok = True if (shutil.which("cursor-agent") or shutil.which("cursor")) else False
+    if not cursor_ok:
+        console.print("[yellow]⚠️  cursor-agent not found[/yellow]")
+        console.print("   Install from: https://docs.cursor.com/en/cli/overview")
     
     console.print("\n[green]✓ Specify CLI is ready to use![/green]")
     if not git_ok:
         console.print("[yellow]Consider installing git for repository management[/yellow]")
-    if not (claude_ok or gemini_ok):
+    if not (claude_ok or gemini_ok or cursor_ok):
         console.print("[yellow]Consider installing an AI assistant for the best experience[/yellow]")
 
 
