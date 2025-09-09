@@ -51,7 +51,8 @@ import readchar
 AI_CHOICES = {
     "copilot": "GitHub Copilot",
     "claude": "Claude Code",
-    "gemini": "Gemini CLI"
+    "gemini": "Gemini CLI",
+    "cursor": "Cursor CLI"
 }
 
 # ASCII Art Banner
@@ -405,12 +406,26 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, verb
             console.print(f"[red]Error fetching release information:[/red] {e}")
         raise typer.Exit(1)
     
-    # Find the template asset for the specified AI assistant
+    # Find the template asset for the specified AI assistant, with fallbacks for Cursor
+    assets = release_data.get("assets", [])
     pattern = f"spec-kit-template-{ai_assistant}"
-    matching_assets = [
-        asset for asset in release_data.get("assets", [])
-        if pattern in asset["name"] and asset["name"].endswith(".zip")
-    ]
+    matching_assets = [asset for asset in assets if pattern in asset["name"] and asset["name"].endswith(".zip")]
+
+    # Fallback: if Cursor template is not yet published, try generic or compatible templates
+    fallback_used = False
+    if not matching_assets and ai_assistant == "cursor":
+        fallback_names = [
+            "spec-kit-template-generic",
+            "spec-kit-template-copilot",
+            "spec-kit-template-claude",
+            "spec-kit-template-gemini",
+        ]
+        for fb in fallback_names:
+            fb_assets = [asset for asset in assets if fb in asset["name"] and asset["name"].endswith(".zip")]
+            if fb_assets:
+                matching_assets = fb_assets
+                fallback_used = True
+                break
     
     if not matching_assets:
         if verbose:
@@ -430,6 +445,8 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, verb
         console.print(f"[cyan]Found template:[/cyan] {filename}")
         console.print(f"[cyan]Size:[/cyan] {file_size:,} bytes")
         console.print(f"[cyan]Release:[/cyan] {release_data['tag_name']}")
+        if fallback_used:
+            console.print(f"[yellow]Note:[/yellow] Using fallback template for Cursor support")
     
     # Download the file
     zip_path = download_dir / filename
@@ -478,7 +495,9 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, verb
         "filename": filename,
         "size": file_size,
         "release": release_data["tag_name"],
-        "asset_url": download_url
+        "asset_url": download_url,
+        "fallback_used": fallback_used,
+        "assistant": ai_assistant,
     }
     return zip_path, metadata
 
@@ -607,6 +626,46 @@ def download_and_extract_template(project_path: Path, ai_assistant: str, is_curr
                         tracker.complete("flatten")
                     elif verbose:
                         console.print(f"[cyan]Flattened nested directory structure[/cyan]")
+                
+                # Inject Cursor rules if using Cursor assistant and rules are missing (supports fallback templates)
+                if ai_assistant == "cursor":
+                    cursor_rules_dir = project_path / ".cursor" / "rules"
+                    if not cursor_rules_dir.exists():
+                        if tracker:
+                            tracker.add("cursor-rules", "Create Cursor rules scaffold")
+                            tracker.start("cursor-rules")
+                        try:
+                            (project_path / ".cursor").mkdir(exist_ok=True)
+                            cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+                            # Minimal rules files
+                            (cursor_rules_dir / "00-repo-context.md").write_text(
+                                """# Repo Context\n\n- Follow memory/constitution.md non-negotiables.\n- Use /templates/commands/* instructions for /specify, /plan, /tasks.\n- Use absolute paths for all file operations.\n""",
+                                encoding="utf-8",
+                            )
+                            (cursor_rules_dir / "10-commands-specify.md").write_text(
+                                """# /specify command mapping\n\nRun: scripts/create-new-feature.sh --json "{ARGS}" from repo root.\nThen write spec using templates/spec-template.md to SPEC_FILE.\n""",
+                                encoding="utf-8",
+                            )
+                            (cursor_rules_dir / "10-commands-plan.md").write_text(
+                                """# /plan command mapping\n\nRun: scripts/setup-plan.sh --json, then execute templates/plan-template.md to generate Phase 0/1 docs.\n""",
+                                encoding="utf-8",
+                            )
+                            (cursor_rules_dir / "10-commands-tasks.md").write_text(
+                                """# /tasks command mapping\n\nRun: scripts/check-task-prerequisites.sh --json, then create tasks.md from templates/tasks-template.md.\n""",
+                                encoding="utf-8",
+                            )
+                            (cursor_rules_dir / "90-safety.md").write_text(
+                                """# Safety\n\n- Use absolute paths resolved from repo root.\n- Avoid destructive operations without explicit confirmation flags.\n- Prefer non-interactive flags in automation contexts.\n""",
+                                encoding="utf-8",
+                            )
+                            if tracker:
+                                tracker.complete("cursor-rules", "scaffolded")
+                        except Exception as e:
+                            if tracker:
+                                tracker.error("cursor-rules", str(e))
+                            else:
+                                if verbose:
+                                    console.print(f"[red]Failed to create Cursor rules scaffold:[/red] {e}")
                     
     except Exception as e:
         if tracker:
@@ -638,7 +697,7 @@ def download_and_extract_template(project_path: Path, ai_assistant: str, is_curr
 @app.command()
 def init(
     project_name: str = typer.Argument(None, help="Name for your new project directory (optional if using --here)"),
-    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, or copilot"),
+    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, copilot, or cursor"),
     ignore_agent_tools: bool = typer.Option(False, "--ignore-agent-tools", help="Skip checks for AI agent tools like Claude Code"),
     no_git: bool = typer.Option(False, "--no-git", help="Skip git repository initialization"),
     here: bool = typer.Option(False, "--here", help="Initialize project in the current directory instead of creating a new one"),
@@ -737,6 +796,10 @@ def init(
             if not check_tool("gemini", "Install from: https://github.com/google-gemini/gemini-cli"):
                 console.print("[red]Error:[/red] Gemini CLI is required for Gemini projects")
                 agent_tool_missing = True
+        elif selected_ai == "cursor":
+            if not check_tool("cursor-agent", "Install from: https://docs.cursor.com/en/cli/overview"):
+                console.print("[red]Error:[/red] Cursor CLI (cursor-agent) is required for Cursor projects")
+                agent_tool_missing = True
         # GitHub Copilot check is not needed as it's typically available in supported IDEs
         
         if agent_tool_missing:
@@ -823,6 +886,10 @@ def init(
         steps_lines.append("   - See GEMINI.md for all available commands")
     elif selected_ai == "copilot":
         steps_lines.append(f"{step_num}. Open in Visual Studio Code and use [bold cyan]/specify[/], [bold cyan]/plan[/], [bold cyan]/tasks[/] commands with GitHub Copilot")
+    elif selected_ai == "cursor":
+        steps_lines.append(f"{step_num}. Use / commands with Cursor CLI (cursor-agent)")
+        steps_lines.append("   - Verify: cursor-agent --version")
+        steps_lines.append("   - Project rules at .cursor/rules (created if missing)")
 
     step_num += 1
     steps_lines.append(f"{step_num}. Update [bold magenta]CONSTITUTION.md[/bold magenta] with your project's non-negotiable principles")
@@ -855,11 +922,12 @@ def check():
     console.print("\n[cyan]Optional AI tools:[/cyan]")
     claude_ok = check_tool("claude", "Install from: https://docs.anthropic.com/en/docs/claude-code/setup")
     gemini_ok = check_tool("gemini", "Install from: https://github.com/google-gemini/gemini-cli")
+    cursor_ok = check_tool("cursor-agent", "Install from: https://docs.cursor.com/en/cli/overview")
     
     console.print("\n[green]✓ Specify CLI is ready to use![/green]")
     if not git_ok:
         console.print("[yellow]Consider installing git for repository management[/yellow]")
-    if not (claude_ok or gemini_ok):
+    if not (claude_ok or gemini_ok or cursor_ok):
         console.print("[yellow]Consider installing an AI assistant for the best experience[/yellow]")
 
 

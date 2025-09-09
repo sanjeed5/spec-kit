@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Incrementally update agent context files based on new feature plan
-# Supports: CLAUDE.md, GEMINI.md, and .github/copilot-instructions.md
+# Supports: CLAUDE.md, GEMINI.md, .github/copilot-instructions.md, and Cursor rules
 # O(1) operation - only reads current context file and new plan.md
 
 set -e
@@ -14,6 +14,7 @@ NEW_PLAN="$FEATURE_DIR/plan.md"
 CLAUDE_FILE="$REPO_ROOT/CLAUDE.md"
 GEMINI_FILE="$REPO_ROOT/GEMINI.md"
 COPILOT_FILE="$REPO_ROOT/.github/copilot-instructions.md"
+CURSOR_RULES_DIR="$REPO_ROOT/.cursor/rules"
 
 # Allow override via argument
 AGENT_TYPE="$1"
@@ -131,7 +132,7 @@ if "$NEW_PROJECT_TYPE" == "web" and "frontend/" not in content:
                         f'\\1{updated_struct}\\2', content, flags=re.DOTALL)
 
 # Add new commands if language is new
-if "$NEW_LANG" and f"# {NEW_LANG}" not in content:
+if "$NEW_LANG" and f"# $NEW_LANG" not in content:
     commands_section = re.search(r'## Commands\n\`\`\`bash\n(.*?)\n\`\`\`', content, re.DOTALL)
     if not commands_section:
         commands_section = re.search(r'## Commands\n(.*?)\n\n', content, re.DOTALL)
@@ -160,7 +161,7 @@ if changes_section:
     # Keep only last 3
     changes = changes[:3]
     content = re.sub(r'(## Recent Changes\n).*?(\n\n|$)', 
-                    f'\\1{chr(10).join(changes)}\\2', content, flags=re.DOTALL)
+                    f'\\1{'\n'.join(changes)}\\2', content, flags=re.DOTALL)
 
 # Update date
 content = re.sub(r'Last updated: \d{4}-\d{2}-\d{2}', 
@@ -170,7 +171,7 @@ content = re.sub(r'Last updated: \d{4}-\d{2}-\d{2}',
 with open("$temp_file", 'w') as f:
     f.write(content)
 EOF
-
+        
         # Restore manual additions if they exist
         if [ -f /tmp/manual_additions.txt ]; then
             # Remove old manual section from temp file
@@ -197,23 +198,41 @@ case "$AGENT_TYPE" in
     "copilot")
         update_agent_file "$COPILOT_FILE" "GitHub Copilot"
         ;;
+    "cursor")
+        echo "Updating Cursor rules..."
+        mkdir -p "$CURSOR_RULES_DIR"
+        CONTEXT_FILE="$CURSOR_RULES_DIR/00-repo-context.md"
+        if [ ! -f "$CONTEXT_FILE" ]; then
+            cat > "$CONTEXT_FILE" <<'EOF'
+# Repo Context
+
+- Follow memory/constitution.md non-negotiables.
+- Use /templates/commands/* instructions for /specify, /plan, /tasks.
+- Use absolute paths for all file operations.
+
+## Active Technologies
+EOF
+        fi
+        if ! grep -q "- $NEW_LANG + $NEW_FRAMEWORK ($CURRENT_BRANCH)" "$CONTEXT_FILE" 2>/dev/null; then
+            echo "- $NEW_LANG + $NEW_FRAMEWORK ($CURRENT_BRANCH)" >> "$CONTEXT_FILE"
+        fi
+        echo "✅ Cursor rules updated"
+        ;;
     "")
         # Update all existing files
         [ -f "$CLAUDE_FILE" ] && update_agent_file "$CLAUDE_FILE" "Claude Code"
         [ -f "$GEMINI_FILE" ] && update_agent_file "$GEMINI_FILE" "Gemini CLI" 
         [ -f "$COPILOT_FILE" ] && update_agent_file "$COPILOT_FILE" "GitHub Copilot"
-        
-        # If no files exist, create based on current directory or ask user
-        if [ ! -f "$CLAUDE_FILE" ] && [ ! -f "$GEMINI_FILE" ] && [ ! -f "$COPILOT_FILE" ]; then
-            echo "No agent context files found. Creating Claude Code context file by default."
-            update_agent_file "$CLAUDE_FILE" "Claude Code"
+        # Cursor rules (only if directory exists)
+        if [ -d "$CURSOR_RULES_DIR" ]; then
+            "$0" cursor || true
         fi
         ;;
     *)
-        echo "ERROR: Unknown agent type '$AGENT_TYPE'. Use: claude, gemini, copilot, or leave empty for all."
+        echo "ERROR: Unknown agent type '$AGENT_TYPE'. Use: claude, gemini, copilot, cursor, or leave empty for all."
         exit 1
         ;;
-esac
+ esac
 echo ""
 echo "Summary of changes:"
 if [ ! -z "$NEW_LANG" ]; then
@@ -227,8 +246,9 @@ if [ ! -z "$NEW_DB" ] && [ "$NEW_DB" != "N/A" ]; then
 fi
 
 echo ""
-echo "Usage: $0 [claude|gemini|copilot]"
+echo "Usage: $0 [claude|gemini|copilot|cursor]"
 echo "  - No argument: Update all existing agent context files"
 echo "  - claude: Update only CLAUDE.md"
 echo "  - gemini: Update only GEMINI.md" 
 echo "  - copilot: Update only .github/copilot-instructions.md"
+echo "  - cursor: Update or create minimal .cursor/rules context"
