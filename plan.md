@@ -19,7 +19,7 @@ This plan outlines the implementation steps to add first-class support for Curso
 ## Assumptions
 
 - Release assets support a new template named `spec-kit-template-cursor` (or a shared template can be adapted at extraction time).
-- Cursor CLI binary is accessible as `cursor` and/or `cursor-agent`; we will check both.
+- Cursor CLI binary is accessible as `cursor-agent` (only).
 - Cursor Rules live at `.cursor/rules` per docs.
 
 ## Implementation Steps
@@ -28,7 +28,7 @@ This plan outlines the implementation steps to add first-class support for Curso
 - Extend `AI_CHOICES` to include `"cursor": "Cursor CLI"`.
 - In `init` validation, accept `--ai cursor`.
 - Tool checks:
-  - Try `shutil.which("cursor")` OR `shutil.which("cursor-agent")`.
+  - Use `shutil.which("cursor-agent")` only.
   - Install hint: `Install from: https://docs.cursor.com/en/cli/overview`.
 - Adjust next steps messaging to include Cursor usage.
 
@@ -57,7 +57,7 @@ This plan outlines the implementation steps to add first-class support for Curso
   - Add Cursor to prerequisites and quickstart examples: `specify init <name> --ai cursor`.
   - Add a short "Using with Cursor" section and link to official docs.
 - `docs/`:
-  - Add `docs/cursor.md`: installation, verifying `cursor --version`/`cursor-agent --version`, overview of `.cursor/rules/`, how /specify, /plan, /tasks map to rules.
+  - Add `docs/cursor.md`: installation, verifying `cursor-agent --version`, overview of `.cursor/rules/`, how /specify, /plan, /tasks map to rules.
   - Update `docs/quickstart.md` where we mention available agents.
 
 6) `spec-kit` release alignment
@@ -93,6 +93,13 @@ This plan outlines the implementation steps to add first-class support for Curso
 
 - MCP server configuration and advanced Cursor integrations.
 - Deep rule authoring beyond minimal bootstrapping and guided commands.
+
+## Assumptions Clarified
+
+- Cursor CLI binary is `cursor-agent` only.
+- Rules directory is `.cursor/rules/`.
+- A release asset `spec-kit-template-cursor` will be available; fallback rule injection is temporary.
+- We will not create or rely on a `cursor` binary name.
 
 ## Approval Gate
 

@@ -45,7 +45,7 @@
 
 - Cursor CLI provides terminal access to Cursor Agent with support for interactive/non-interactive sessions.
 - Cursor Rules: repository-scoped rules live under `.cursor/rules/` and guide agent behavior; useful for consistent command execution and project conventions.
-- Installation (typical): `curl https://cursor.com/install -fsS | bash`; binary exposes commands like `cursor` and/or `cursor-agent` (verify exact name per environment).
+- Installation (typical): `curl https://cursor.com/install -fsS | bash`; binary available as `cursor-agent` only.
 
 ## Gaps to Add Cursor Support
 
@@ -66,14 +66,13 @@
   - `init` command is interactive when `--ai` not provided; ensure non-interactive flow works for Cursor via `--ai cursor`.
 
 - Tool Availability Checks:
-  - `check()` and `init` perform tool checks. For Cursor, add a check for `cursor` or `cursor-agent` and provide install hint.
+  - `check()` and `init` perform tool checks. For Cursor, add a check for `cursor-agent` and provide install hint.
 
 - Rule Bootstrapping:
   - On `plan` Phase 1, agent-specific file creation is delegated to `update-agent-context.sh`. For Cursor, rules likely come from template; updates may be incremental (append or regenerate rules).
 
 ## Risks
 
-- Binary name differences (`cursor` vs `cursor-agent`) across platforms.
 - Template asset availability for Cursor; fallback path may be required until release asset exists.
 - Rule format/versioning changes in Cursor docs; need to pin minimal viable rule structure.
 
@@ -83,4 +82,12 @@
 - Expect template asset `spec-kit-template-cursor` to be available; if not, temporarily reuse a generic template and inject `.cursor/rules` during extraction.
 - Extend `update-agent-context.sh` to manage `.cursor/rules/` content with minimal, merge-safe updates.
 - Document Cursor usage in `README.md` and add a `docs/cursor.md` quickstart.
+
+## Assumptions Clarified
+
+- Cursor CLI binary is `cursor-agent` only (no `cursor` binary expected).
+- `.cursor/rules/` is the correct rules directory recognized by Cursor.
+- A release asset named `spec-kit-template-cursor` will be published; until then, CLI will inject a minimal rules scaffold as fallback.
+- MCP/server configuration is out of scope for this phase.
+- Rule bootstrap focuses on mapping `/specify`, `/plan`, `/tasks` to existing scripts with absolute paths; advanced rule authoring is deferred.
 
