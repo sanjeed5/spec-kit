@@ -840,7 +840,7 @@ def init(
     elif selected_ai == "cursor":
         steps_lines.append(f"{step_num}. Use Cursor CLI")
         steps_lines.append("   - Run cursor-agent to start a session")
-        steps_lines.append("   - See CURSOR.md for commands and guidance")
+        steps_lines.append("   - Add rules under .cursor/rules (see https://docs.cursor.com/en/context/rules)")
     elif selected_ai == "copilot":
         steps_lines.append(f"{step_num}. Open in Visual Studio Code and use [bold cyan]/specify[/], [bold cyan]/plan[/], [bold cyan]/tasks[/] commands with GitHub Copilot")
 

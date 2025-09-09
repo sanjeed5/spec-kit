@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Incrementally update agent context files based on new feature plan
-# Supports: CLAUDE.md, GEMINI.md, CURSOR.md, and .github/copilot-instructions.md
+# Supports: CLAUDE.md, GEMINI.md, .cursor/rules/spec-kit.md, and .github/copilot-instructions.md
 # O(1) operation - only reads current context file and new plan.md
 
 set -e
@@ -13,7 +13,8 @@ NEW_PLAN="$FEATURE_DIR/plan.md"
 # Determine which agent context files to update
 CLAUDE_FILE="$REPO_ROOT/CLAUDE.md"
 GEMINI_FILE="$REPO_ROOT/GEMINI.md"
-CURSOR_FILE="$REPO_ROOT/CURSOR.md"
+CURSOR_RULES_DIR="$REPO_ROOT/.cursor/rules"
+CURSOR_FILE="$CURSOR_RULES_DIR/spec-kit.md"
 COPILOT_FILE="$REPO_ROOT/.github/copilot-instructions.md"
 
 # Allow override via argument
@@ -196,6 +197,7 @@ case "$AGENT_TYPE" in
         update_agent_file "$GEMINI_FILE" "Gemini CLI"
         ;;
     "cursor")
+        mkdir -p "$CURSOR_RULES_DIR"
         update_agent_file "$CURSOR_FILE" "Cursor CLI"
         ;;
     "copilot")
@@ -205,7 +207,12 @@ case "$AGENT_TYPE" in
         # Update all existing files
         [ -f "$CLAUDE_FILE" ] && update_agent_file "$CLAUDE_FILE" "Claude Code"
         [ -f "$GEMINI_FILE" ] && update_agent_file "$GEMINI_FILE" "Gemini CLI" 
-        [ -f "$CURSOR_FILE" ] && update_agent_file "$CURSOR_FILE" "Cursor CLI"
+        if [ -f "$CURSOR_FILE" ]; then
+            update_agent_file "$CURSOR_FILE" "Cursor CLI"
+        elif [ -d "$CURSOR_RULES_DIR" ]; then
+            # If rules dir exists but file not present, create it
+            update_agent_file "$CURSOR_FILE" "Cursor CLI"
+        fi
         [ -f "$COPILOT_FILE" ] && update_agent_file "$COPILOT_FILE" "GitHub Copilot"
         
         # If no files exist, create based on current directory or ask user
@@ -236,5 +243,5 @@ echo "Usage: $0 [claude|gemini|cursor|copilot]"
 echo "  - No argument: Update all existing agent context files"
 echo "  - claude: Update only CLAUDE.md"
 echo "  - gemini: Update only GEMINI.md" 
-echo "  - cursor: Update only CURSOR.md" 
+echo "  - cursor: Update or create .cursor/rules/spec-kit.md" 
 echo "  - copilot: Update only .github/copilot-instructions.md"
